@@ -16,20 +16,28 @@ fetch("tickets.csv")
    FIXED CSV PARSER (IMPORTANT)
 ----------------------------*/
 function parseCSV(data) {
-    const rows = data.split(/\r?\n/).slice(1);
+    const lines = data.split(/\r?\n/).filter(l => l.trim().length > 0);
 
-    return rows
-        .map(row => row.trim())
-        .filter(row => row.length > 0)
-        .map(row => {
-            const firstComma = row.indexOf(",");
+    const result = [];
 
-            const id = row.substring(0, firstComma)?.trim();
-            const title = row.substring(firstComma + 1)?.trim();
+    for (let i = 1; i < lines.length; i++) {
+        const line = lines[i];
 
-            return { id, title };
-        })
-        .filter(t => t.id && t.title);
+        // split ONLY on first comma
+        const firstCommaIndex = line.indexOf(",");
+
+        if (firstCommaIndex === -1) continue;
+
+        const id = line.substring(0, firstCommaIndex).trim();
+        const title = line.substring(firstCommaIndex + 1).trim();
+
+        result.push({
+            id,
+            title
+        });
+    }
+
+    return result;
 }
 
 /* ---------------------------
