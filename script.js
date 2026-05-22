@@ -1,7 +1,7 @@
 let tickets = [];
 
 // Load CSV safely
-fetch("tickets.csv")
+fetch("Tickets.csv")
     .then(res => res.text())
     .then(data => {
         tickets = parseCSV(data);
