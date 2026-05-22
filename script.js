@@ -1,36 +1,49 @@
 let tickets = [];
 
-// Load CSV on startup
+// Load CSV safely
 fetch("tickets.csv")
     .then(res => res.text())
     .then(data => {
         tickets = parseCSV(data);
-        addMessage("✅ Ticket database loaded. Ask me anything.", "bot");
+        addMessage(`✅ Loaded ${tickets.length} tickets`, "bot");
+    })
+    .catch(err => {
+        addMessage("❌ Failed to load CSV", "bot");
+        console.error(err);
     });
 
+/* ---------------------------
+   FIXED CSV PARSER (IMPORTANT)
+----------------------------*/
 function parseCSV(data) {
-    const rows = data.split("\n").slice(1);
+    const rows = data.split(/\r?\n/).slice(1);
 
     return rows
-        .filter(r => r.trim() !== "")
-        .map(r => {
-            const [id, title] = r.split(",");
-            return {
-                id: id?.trim(),
-                title: title?.trim()
-            };
-        });
+        .map(row => row.trim())
+        .filter(row => row.length > 0)
+        .map(row => {
+            const firstComma = row.indexOf(",");
+
+            const id = row.substring(0, firstComma)?.trim();
+            const title = row.substring(firstComma + 1)?.trim();
+
+            return { id, title };
+        })
+        .filter(t => t.id && t.title);
 }
 
+/* ---------------------------
+   SEND MESSAGE
+----------------------------*/
 function sendMessage() {
     const input = document.getElementById("userInput");
     const query = input.value.trim();
-    input.value = "";
 
     if (!query) return;
 
-    addMessage(query, "user");
+    input.value = "";
 
+    addMessage(query, "user");
     addMessage("🧠 Searching tickets...", "bot");
 
     setTimeout(() => {
@@ -41,9 +54,9 @@ function sendMessage() {
             return;
         }
 
-        let response = `🔎 Found ${results.length} ticket(s):\n\n`;
+        let response = `🔎 Found ${results.length} result(s):\n\n`;
 
-        results.slice(0, 5).forEach(t => {
+        results.slice(0, 7).forEach(t => {
             response += 
 `🎫 ID: ${t.id}
 📌 Title: ${t.title}
@@ -53,43 +66,51 @@ function sendMessage() {
         });
 
         addMessage(response, "bot");
-
-    }, 600);
+    }, 500);
 }
 
+/* ---------------------------
+   SMART SEARCH (FIXED)
+----------------------------*/
 function findSimilar(query) {
-    query = query.toLowerCase();
+    const q = query.toLowerCase().trim();
 
     return tickets.map(t => {
         let score = 0;
-        const title = (t.title || "").toLowerCase();
 
-        // exact match boost
-        if (title.includes(query)) score += 60;
+        const title = String(t.title || "").toLowerCase().trim();
 
-        // word matching
-        const words = query.split(" ");
+        // exact substring match
+        if (title.includes(q)) score += 60;
+
+        // word-based match
+        const words = q.split(" ");
         words.forEach(w => {
             if (w.length > 2 && title.includes(w)) {
                 score += 15;
             }
         });
 
-        return {
-            ...t,
-            score
-        };
+        // partial match (important for short words like "photo")
+        if (q.length > 2 && title.includes(q)) {
+            score += 30;
+        }
+
+        return { ...t, score };
     })
-    .filter(t => t.score > 10)
+    .filter(t => t.score > 5)   // IMPORTANT: low threshold
     .sort((a, b) => b.score - a.score);
 }
 
+/* ---------------------------
+   UI HELPER
+----------------------------*/
 function addMessage(text, type) {
     const div = document.createElement("div");
     div.className = "message " + type;
     div.innerText = text;
 
-    document.getElementById("chatBox").appendChild(div);
-    document.getElementById("chatBox").scrollTop =
-        document.getElementById("chatBox").scrollHeight;
+    const chat = document.getElementById("chatBox");
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
 }
